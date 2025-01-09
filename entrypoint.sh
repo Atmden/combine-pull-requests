@@ -21,9 +21,8 @@ git config user.email "${GIT_AUTHOR_EMAIL}"
 [ -n "${OWNER}" ] || fail "Could not determine GitHub owner from GITHUB_REPOSITORY."
 [ -n "${REPO}" ] || fail "Could not determine GitHub repo from GITHUB_REPOSITORY."
 
-# Fetch the SHAs from the pull requests that are marked with $PULL_REQUEST_LABEL.
-readarray -t shas < <(
-  jq -cn '
+# Fetch the PR titles, branch names, and SHAs from the pull requests that are marked with $PULL_REQUEST_LABEL.
+pr_info=$(jq -cn '
     {
       query: $query,
       variables: {
@@ -37,6 +36,8 @@ readarray -t shas < <(
         repository(owner: $owner, name: $repo) {
           pullRequests(states: OPEN, labels: [$pull_request_label], first: 100) {
             nodes {
+              title
+              headRefName
               headRefOid
             }
           }
@@ -52,19 +53,30 @@ readarray -t shas < <(
       --header "Authorization: token $GITHUB_TOKEN" \
       --header "Content-Type: application/json" \
       --data @- \
-      https://api.github.com/graphql |
-    jq -r '.data.repository.pullRequests.nodes | .[].headRefOid'
-)
+      https://api.github.com/graphql)
 
-# Do not attempt to merge if there are no pull requests to be merged.
-if [ ${#shas[@]} -eq 0 ]; then
+# Extract the PR details using jq.
+titles_and_branches=$(echo "$pr_info" | jq -r '
+  .data.repository.pullRequests.nodes[] |
+  "\(.title) (\(.headRefName)): \(.headRefOid)"
+')
+
+# Check if there are any results.
+if [ -z "$titles_and_branches" ]; then
   echo "No pull requests with label $PULL_REQUEST_LABEL"
   exit 0
 fi
 
-# Merge all shas together into one commit.
-git fetch origin "${shas[@]}"
-git merge --no-ff --no-commit "${shas[@]}"
-git commit --message "Merged Pull Requests (${shas[*]})"
+# Print the details of each pull request.
+echo "Found the following pull requests with label $PULL_REQUEST_LABEL:"
+echo "$titles_and_branches"
+
+# Extract SHAs for merging.
+shas=$(echo "$pr_info" | jq -r '.data.repository.pullRequests.nodes[].headRefOid')
+
+# Merge all SHAs together into one commit.
+git fetch origin ${shas}
+git merge --no-ff --no-commit ${shas}
+git commit --message "Merged Pull Requests: $titles_and_branches"
 
 echo "Merged ${#shas[@]} pull requests"
