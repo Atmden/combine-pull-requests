@@ -67,10 +67,13 @@ if [ -z "$titles_and_branches" ]; then
   exit 0
 fi
 
+echo " "
 # Print the details of each pull request.
 echo "Found the following pull requests with label $PULL_REQUEST_LABEL:"
+echo "-----------------------------------------------------------------"
 echo "$titles_and_branches"
-
+echo "-----------------------------------------------------------------"
+echo " "
 # Extract SHAs for merging.
 shas=$(echo "$pr_info" | jq -r '.data.repository.pullRequests.nodes[].headRefOid')
 
