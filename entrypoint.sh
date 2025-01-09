@@ -67,7 +67,7 @@ if [ -z "$titles_and_branches" ]; then
   exit 0
 fi
 
-echo " "
+echo " " 
 # Print the details of each pull request.
 echo "Found the following pull requests with label $PULL_REQUEST_LABEL:"
 echo "-----------------------------------------------------------------"
